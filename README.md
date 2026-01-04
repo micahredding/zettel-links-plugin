@@ -1,20 +1,27 @@
-# Zettel Link Creator Plugin
+# Zettel Links
 
-An Obsidian plugin for creating Zettelkasten-style links with automatic timestamp extraction.
+Complete Zettelkasten workflow for Obsidian: create timestamp-based links and resolve them to matching notes. Works seamlessly with other Zettelkasten tools like The Archive.
 
 ## Features
 
+### Link Creation
 - **Ribbon Icon**: Click the link icon in the left sidebar (works on desktop and mobile!)
 - **Mobile Toolbar**: Appears in the mobile toolbar when editing
 - **Keyboard Shortcut**: Press `Cmd+Shift+L` (Mac) or `Ctrl+Shift+L` (Windows/Linux)
 - **Command Palette**: Search for "Insert Zettel Link"
 - **Smart Link Formatting**:
-  - Files starting with 12-digit timestamps (YYYYMMDDHHMM) become `[[timestamp]] Title`
+  - Files starting with timestamps (default: 12-digit YYYYMMDDHHMM) become `[[timestamp]] Title`
   - Regular files become standard `[[filename]]` links
+
+### Link Resolution
+- **Timestamp Resolution**: Links like `[[202512270824]]` automatically resolve to files starting with that timestamp (e.g., `202512270824 Christmas Traditions.md`)
+- **Partial Matching**: Optional partial filename matching for greater interoperability
+- **Multiple Match Handling**: If multiple files match, choose from a convenient picker modal
+- **Interoperability**: Works with other Zettelkasten tools like The Archive
 
 ## Usage
 
-### Basic Workflow
+### Creating Links
 
 1. Position cursor where you want to insert a link
 2. Trigger the modal using one of these methods:
@@ -33,7 +40,7 @@ The plugin works seamlessly on mobile:
 - **Ribbon Icon**: Also available in the left sidebar ribbon
 - Simply tap either one while editing to open the file picker
 
-### Examples
+#### Examples
 
 **Zettelkasten timestamp file:**
 ```
@@ -47,20 +54,63 @@ File: "Project Ideas.md"
 Output: [[Project Ideas]]
 ```
 
+### Resolving Links
+
+When you click on a link in your notes:
+
+**Direct match (standard Obsidian behavior):**
+```
+[[Project Ideas]] → Project Ideas.md
+```
+
+**Timestamp resolution:**
+```
+[[202512270824]] → 202512270824 Christmas Traditions.md
+```
+
+**Partial match:**
+```
+[[partial-match]] → partial-matching might be unexpected.md
+```
+
+**Multiple matches:**
+- A modal appears showing all matching files
+- Choose the correct file from the list
+- Or cancel to create a new note
+
+**No match:**
+```
+[[202503102352]] unmatched link → Creates new note: 202503102352.md
+```
+
 ## How It Works
 
-The plugin detects files following the Zettelkasten timestamp naming convention (12-digit YYYYMMDDHHMM prefix) and automatically:
+### Link Creation
+The plugin detects files following the Zettelkasten timestamp naming convention (configurable timestamp length, default 12-digit YYYYMMDDHHMM prefix) and automatically:
 - Extracts the timestamp as the link target
 - Appends the rest of the filename as readable text outside the link
 - This allows concise links while maintaining readability
 
 For files without timestamp prefixes, it creates standard Obsidian wiki-style links.
 
+### Link Resolution
+The plugin overrides Obsidian's link resolution to:
+1. First try standard Obsidian link matching (exact filename)
+2. If no match, search for files whose names contain the link text
+3. If one match found, open that file
+4. If multiple matches found, show chooser modal
+5. If no match, fall back to Obsidian's default (create new note)
+
+This enables:
+- Timestamp-based linking (Zettelkasten style)
+- Interoperability with other Zettelkasten tools
+- Partial filename matching (optional)
+
 ## Settings
 
-Access settings via **Settings → Zettel Link Creator** in Obsidian.
+Access settings via **Settings → Zettel Links** in Obsidian.
 
-### Available Options
+### Link Creation Settings
 
 - **Extract timestamps** (default: enabled)
   - Toggle timestamp extraction on/off
@@ -79,6 +129,19 @@ Access settings via **Settings → Zettel Link Creator** in Obsidian.
   - Include filename text after timestamp link
   - When enabled: `[[202512270824]] Christmas Traditions`
   - When disabled: `[[202512270824]]`
+
+### Link Resolution Settings
+
+- **Enable link resolution** (default: enabled)
+  - Resolve timestamp links to matching files
+  - Enables interoperability with The Archive and other tools
+  - When disabled, uses standard Obsidian link behavior only
+
+- **Enable partial matching** (default: enabled)
+  - Match partial filenames when resolving links
+  - **WARNING**: This makes ALL links look for partial matches before creating new notes
+  - Disable if you want standard Obsidian link behavior
+  - Only active when link resolution is enabled
 
 ## Development
 

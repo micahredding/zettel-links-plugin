@@ -1,10 +1,11 @@
 {
-	"id": "zettel-link-creator-plugin",
-	"name": "Zettel Link Creator Plugin",
-	"version": "1.0.2",
+	"id": "zettel-links",
+	"name": "Zettel Links",
+	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Create Zettelkasten-style links with automatic timestamp extraction. Works seamlessly on mobile with toolbar integration.",
+	"description": "Complete Zettelkasten workflow for Obsidian: create timestamp-based links and resolve them to matching notes. Works seamlessly with other Zettelkasten tools like The Archive.",
 	"author": "Micah Redding",
 	"authorUrl": "https://micahredding.com",
+	"fundingUrl": "https://www.micahredding.com/support",
 	"isDesktopOnly": false
 }

@@ -1,10 +1,10 @@
-import { App, Editor, MarkdownView, Plugin, PluginSettingTab, Setting, SuggestModal, TFile } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Plugin, PluginSettingTab, Setting, SuggestModal, TFile } from 'obsidian';
 
 /**
  * Plugin settings interface.
  */
 interface ZettelLinkSettings {
-    /** Whether to extract timestamps from filenames */
+    /** Whether to extract timestamps from filenames when creating links */
     extractTimestamps: boolean;
     /** Number of digits in timestamp (default: 12 for YYYYMMDDHHMM) */
     timestampLength: number;
@@ -12,6 +12,10 @@ interface ZettelLinkSettings {
     showFullPath: boolean;
     /** Whether to append filename text after timestamp link */
     appendFileName: boolean;
+    /** Whether to enable link resolution (timestamp links resolve to matching notes) */
+    enableLinkResolution: boolean;
+    /** Whether to enable partial filename matching when resolving links */
+    enablePartialMatching: boolean;
 }
 
 /**
@@ -21,15 +25,71 @@ const DEFAULT_SETTINGS: ZettelLinkSettings = {
     extractTimestamps: true,
     timestampLength: 12,
     showFullPath: true,
-    appendFileName: true
+    appendFileName: true,
+    enableLinkResolution: true,
+    enablePartialMatching: true
 };
+
+/**
+ * Modal for choosing between multiple matching files when resolving a link.
+ */
+class LinkChooserModal extends Modal {
+    private resolve: (value: TFile | null) => void;
+    private matches: TFile[];
+    private linktext: string;
+
+    constructor(app: App, linktext: string, matches: TFile[], resolve: (value: TFile | null) => void) {
+        super(app);
+        this.matches = matches;
+        this.resolve = resolve;
+        this.linktext = linktext;
+    }
+
+    onOpen() {
+        const {contentEl} = this;
+        contentEl.empty();
+
+        contentEl.createEl('h2', {text: 'Multiple matches found'});
+        contentEl.createEl('p', {text: `Choose the correct note for "${this.linktext}":`});
+
+        const list = contentEl.createEl('div', {
+            cls: 'link-chooser-list'
+        });
+
+        this.matches.forEach((file) => {
+            const item = list.createEl('div', {
+                cls: 'link-chooser-item',
+                text: file.basename
+            });
+
+            item.onClickEvent(() => {
+                this.resolve(file);
+                this.close();
+            });
+        });
+
+        const cancelButton = contentEl.createEl('button', {
+            text: 'Cancel',
+            cls: 'link-chooser-cancel'
+        });
+
+        cancelButton.onClickEvent(() => {
+            this.resolve(null);
+            this.close();
+        });
+    }
+
+    onClose() {
+        const {contentEl} = this;
+        contentEl.empty();
+    }
+}
 
 /**
  * Modal dialog for selecting files from the vault to create Zettelkasten-style links.
  *
  * This modal provides file search functionality and automatically formats links based on
- * the filename pattern. For files starting with a 12-digit timestamp (YYYYMMDDHHMM),
- * it creates compact timestamp-only links.
+ * the filename pattern. For files starting with a timestamp, it creates compact timestamp-only links.
  *
  * @example
  * File: "202512270824 Christmas Traditions.md"
@@ -79,12 +139,9 @@ class FileSelectModal extends SuggestModal<TFile> {
      * Process the selected file and insert the formatted link.
      *
      * Link formatting rules:
-     * - If filename starts with 12-digit timestamp (YYYYMMDDHHMM): Extract timestamp,
-     *   create [[timestamp]] link, append rest of filename as plain text
+     * - If filename starts with timestamp: Extract timestamp, create [[timestamp]] link,
+     *   append rest of filename as plain text
      * - Otherwise: Create standard [[filename]] link
-     *
-     * Also cleans up trailing "}" or "}}" characters that may have been typed
-     * as part of a "{{...}}" sequence.
      */
     onChooseItem(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
         const fileName = file.basename;
@@ -120,25 +177,24 @@ class FileSelectModal extends SuggestModal<TFile> {
 }
 
 /**
- * Zettel Link Creator Plugin
+ * Zettel Links Plugin
  *
- * Creates Zettelkasten-style links with timestamp extraction for files following
- * the pattern: "YYYYMMDDHHMM Title.md"
+ * Complete Zettelkasten workflow for Obsidian:
+ * 1. Create timestamp-based links with automatic formatting
+ * 2. Resolve timestamp links to matching notes
  *
  * Features:
- * - Type "{{" to trigger file selection modal
- * - Use Cmd+Shift+L (Mac) / Ctrl+Shift+L (Windows/Linux) to open modal
+ * - Ribbon icon and keyboard shortcut (Cmd+Shift+L) to insert links
  * - Automatically formats timestamp-based filenames as [[timestamp]] Title
- * - Cleans up trailing braces from "{{...}}" sequences
- *
- * Workflow:
- * 1. User types "{{" or presses hotkey
- * 2. Modal opens with searchable file list
- * 3. User selects file (via arrow keys + Enter or mouse click)
- * 4. Plugin inserts formatted link at cursor position
+ * - Resolves [[timestamp]] links to files starting with that timestamp
+ * - Partial filename matching for greater interoperability
+ * - Works seamlessly on mobile
  */
-export default class ZettelLinkPlugin extends Plugin {
+export default class ZettelLinksPlugin extends Plugin {
     settings: ZettelLinkSettings;
+    private chooserOpen = false;
+    private lastChosenFile: TFile | null = null;
+    private originalGetFirstLinkpathDest: ((linktext: string, sourcePath: string) => TFile | null) | null = null;
 
     async onload() {
         await this.loadSettings();
@@ -163,12 +219,18 @@ export default class ZettelLinkPlugin extends Plugin {
             }
         });
 
+        // Setup link resolution if enabled
+        this.setupLinkResolution();
+
         // Add settings tab
-        this.addSettingTab(new ZettelLinkSettingTab(this.app, this));
+        this.addSettingTab(new ZettelLinksSettingTab(this.app, this));
     }
 
     onunload() {
-        // Cleanup handled automatically by Obsidian
+        // Restore original getFirstLinkpathDest if we modified it
+        if (this.originalGetFirstLinkpathDest) {
+            this.app.metadataCache.getFirstLinkpathDest = this.originalGetFirstLinkpathDest;
+        }
     }
 
     async loadSettings() {
@@ -177,6 +239,9 @@ export default class ZettelLinkPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+
+        // Update link resolution when settings change
+        this.setupLinkResolution();
     }
 
     /**
@@ -186,15 +251,81 @@ export default class ZettelLinkPlugin extends Plugin {
         const modal = new FileSelectModal(this.app, editor, this.settings);
         modal.open();
     }
+
+    /**
+     * Setup or teardown link resolution based on settings.
+     */
+    setupLinkResolution() {
+        // Restore original method if we previously overrode it
+        if (this.originalGetFirstLinkpathDest) {
+            this.app.metadataCache.getFirstLinkpathDest = this.originalGetFirstLinkpathDest;
+            this.originalGetFirstLinkpathDest = null;
+        }
+
+        // Only override if link resolution is enabled
+        if (!this.settings.enableLinkResolution) {
+            return;
+        }
+
+        // Store the original method
+        this.originalGetFirstLinkpathDest = this.app.metadataCache.getFirstLinkpathDest;
+
+        // Override the method with our custom logic
+        this.app.metadataCache.getFirstLinkpathDest = (linktext: string, sourcePath: string): TFile | null => {
+            // 1. Try the default resolution
+            let file = this.originalGetFirstLinkpathDest!.call(this.app.metadataCache, linktext, sourcePath);
+            if (file) {
+                return file;
+            }
+
+            // 2. If partial matching disabled, return null (no match)
+            if (!this.settings.enablePartialMatching) {
+                return null;
+            }
+
+            // 3. Do a partial match search
+            const allFiles = this.app.vault.getMarkdownFiles();
+            const linktextLower = linktext.toLowerCase();
+
+            // Filter files whose filename includes the link text
+            const matches = allFiles.filter((f) =>
+                f.basename.toLowerCase().includes(linktextLower)
+            );
+
+            // 4. If multiple matches and not already choosing, show modal
+            if (matches.length > 1 && !this.chooserOpen) {
+                this.chooserOpen = true;
+                new Promise<TFile | null>((resolve) => {
+                    new LinkChooserModal(this.app, linktext, matches, (file) => {
+                        this.lastChosenFile = file;
+                        this.chooserOpen = false;
+                        resolve(file);
+                    }).open();
+                });
+                return this.lastChosenFile;
+            } else if (matches.length === 1) {
+                return matches[0];
+            }
+
+            return null;
+        };
+
+        // Store the modified method for cleanup
+        this.register(() => {
+            if (this.originalGetFirstLinkpathDest) {
+                this.app.metadataCache.getFirstLinkpathDest = this.originalGetFirstLinkpathDest;
+            }
+        });
+    }
 }
 
 /**
- * Settings tab for configuring the Zettel Link Creator plugin.
+ * Settings tab for configuring the Zettel Links plugin.
  */
-class ZettelLinkSettingTab extends PluginSettingTab {
-    plugin: ZettelLinkPlugin;
+class ZettelLinksSettingTab extends PluginSettingTab {
+    plugin: ZettelLinksPlugin;
 
-    constructor(app: App, plugin: ZettelLinkPlugin) {
+    constructor(app: App, plugin: ZettelLinksPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -203,11 +334,14 @@ class ZettelLinkSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Zettel Link Creator Settings' });
+        containerEl.createEl('h2', { text: 'Zettel Links Settings' });
+
+        // Link Creation Settings
+        containerEl.createEl('h3', { text: 'Link Creation' });
 
         new Setting(containerEl)
             .setName('Extract timestamps')
-            .setDesc('Enable timestamp extraction from filenames')
+            .setDesc('Enable timestamp extraction from filenames when creating links')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.extractTimestamps)
                 .onChange(async (value) => {
@@ -246,6 +380,30 @@ class ZettelLinkSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.appendFileName)
                 .onChange(async (value) => {
                     this.plugin.settings.appendFileName = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Link Resolution Settings
+        containerEl.createEl('h3', { text: 'Link Resolution' });
+
+        new Setting(containerEl)
+            .setName('Enable link resolution')
+            .setDesc('Resolve timestamp links (e.g., [[202512270824]]) to files starting with that timestamp. Also enables interoperability with other Zettelkasten tools like The Archive.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableLinkResolution)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableLinkResolution = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Enable partial matching')
+            .setDesc('When resolving links, match partial filenames. WARNING: This makes ALL links look for partial matches before creating new notes. Disable if you want standard Obsidian link behavior.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enablePartialMatching)
+                .setDisabled(!this.plugin.settings.enableLinkResolution)
+                .onChange(async (value) => {
+                    this.plugin.settings.enablePartialMatching = value;
                     await this.plugin.saveSettings();
                 }));
     }
