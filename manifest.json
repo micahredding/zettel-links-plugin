@@ -1,9 +1,9 @@
 {
 	"id": "zettel-link-creator-plugin",
 	"name": "Zettel Link Creator Plugin",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
-	"description": "Create Zettelkasten-style links with automatic timestamp extraction. Type '{{' to quickly link to notes with timestamp-based filenames.",
+	"description": "Create Zettelkasten-style links with automatic timestamp extraction. Works seamlessly on mobile with toolbar integration.",
 	"author": "Micah Redding",
 	"authorUrl": "https://micahredding.com",
 	"isDesktopOnly": false

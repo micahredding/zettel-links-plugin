@@ -4,8 +4,6 @@ import { App, Editor, MarkdownView, Plugin, PluginSettingTab, Setting, SuggestMo
  * Plugin settings interface.
  */
 interface ZettelLinkSettings {
-    /** Trigger sequence to open the file selection modal */
-    triggerSequence: string;
     /** Whether to extract timestamps from filenames */
     extractTimestamps: boolean;
     /** Number of digits in timestamp (default: 12 for YYYYMMDDHHMM) */
@@ -20,7 +18,6 @@ interface ZettelLinkSettings {
  * Default plugin settings.
  */
 const DEFAULT_SETTINGS: ZettelLinkSettings = {
-    triggerSequence: '{{',
     extractTimestamps: true,
     timestampLength: 12,
     showFullPath: true,
@@ -117,51 +114,8 @@ class FileSelectModal extends SuggestModal<TFile> {
             insertionText = `[[${fileName}]]`;
         }
 
-        const cursor = this.editor.getCursor();
-
-        // Clean up any auto-paired closing characters that match the trigger sequence
-        const line = this.editor.getLine(cursor.line);
-        const afterCursor = line.substring(cursor.ch);
-
-        // Common auto-pair mappings
-        const autoPairMap: { [key: string]: string } = {
-            '{': '}',
-            '[': ']',
-            '(': ')',
-            '<': '>',
-            '"': '"',
-            "'": "'",
-            '`': '`'
-        };
-
-        // Build expected closing sequence based on auto-pairing rules
-        let expectedClosing = '';
-        for (let i = this.settings.triggerSequence.length - 1; i >= 0; i--) {
-            const char = this.settings.triggerSequence[i];
-            expectedClosing += autoPairMap[char] || char;
-        }
-
-        let charsToRemove = 0;
-
-        // Check for complete expected closing sequence
-        if (expectedClosing && afterCursor.startsWith(expectedClosing)) {
-            charsToRemove = expectedClosing.length;
-        } else if (expectedClosing.length > 0) {
-            // Check for partial closing (just the first closing character)
-            const firstClosingChar = expectedClosing[0];
-            if (afterCursor.startsWith(firstClosingChar)) {
-                charsToRemove = 1;
-            }
-        }
-
-        if (charsToRemove > 0) {
-            this.editor.replaceRange("",
-                cursor,
-                { line: cursor.line, ch: cursor.ch + charsToRemove }
-            );
-        }
-
-        this.editor.replaceRange(insertionText, cursor);
+        // Insert the link at cursor position
+        this.editor.replaceRange(insertionText, this.editor.getCursor());
     }
 }
 
@@ -190,7 +144,7 @@ export default class ZettelLinkPlugin extends Plugin {
         await this.loadSettings();
 
         // Add ribbon icon for mobile and easy access
-        this.addRibbonIcon('link', 'Insert Zettel Link', (evt: MouseEvent) => {
+        this.addRibbonIcon('links-coming-in', 'Insert Zettel Link', (_evt: MouseEvent) => {
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (activeView) {
                 this.openFileSearchModal(activeView.editor);
@@ -198,47 +152,14 @@ export default class ZettelLinkPlugin extends Plugin {
         });
 
         // Register command for manual invocation via command palette or hotkey
+        // This is what appears in the mobile toolbar
         this.addCommand({
             id: 'insert-zettel-link',
             name: 'Insert Zettel Link',
+            icon: 'links-coming-in',
             hotkeys: [{ modifiers: ["Mod", "Shift"], key: "L" }],
             editorCallback: (editor: Editor, _view: MarkdownView) => {
                 this.openFileSearchModal(editor);
-            }
-        });
-
-        // Register keyboard listener to detect trigger sequence
-        this.registerDomEvent(document, 'keydown', (evt: KeyboardEvent) => {
-            // Only proceed if trigger sequence is 2+ characters
-            if (this.settings.triggerSequence.length < 2) return;
-
-            const lastChar = this.settings.triggerSequence[this.settings.triggerSequence.length - 1];
-
-            if (evt.key === lastChar) {
-                const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView);
-                if (!activeLeaf) return;
-
-                const editor = activeLeaf.editor;
-                const cursor = editor.getCursor();
-                const line = editor.getLine(cursor.line);
-
-                // Check if we've typed the complete trigger sequence
-                const triggerPrefix = this.settings.triggerSequence.substring(0, this.settings.triggerSequence.length - 1);
-                const textBefore = line.substring(cursor.ch - triggerPrefix.length, cursor.ch);
-
-                if (textBefore === triggerPrefix) {
-                    // Prevent the last character from being inserted
-                    evt.preventDefault();
-
-                    // Remove the trigger prefix that was already inserted
-                    editor.replaceRange("",
-                        { line: cursor.line, ch: cursor.ch - triggerPrefix.length },
-                        { line: cursor.line, ch: cursor.ch }
-                    );
-
-                    // Open file selection modal
-                    this.openFileSearchModal(editor);
-                }
             }
         });
 
@@ -283,19 +204,6 @@ class ZettelLinkSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         containerEl.createEl('h2', { text: 'Zettel Link Creator Settings' });
-
-        new Setting(containerEl)
-            .setName('Trigger sequence')
-            .setDesc('Character sequence to trigger the file selection modal (e.g., "{{" or "@@")')
-            .addText(text => text
-                .setPlaceholder('{{')
-                .setValue(this.plugin.settings.triggerSequence)
-                .onChange(async (value) => {
-                    if (value.length >= 2) {
-                        this.plugin.settings.triggerSequence = value;
-                        await this.plugin.saveSettings();
-                    }
-                }));
 
         new Setting(containerEl)
             .setName('Extract timestamps')

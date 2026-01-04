@@ -4,14 +4,13 @@ An Obsidian plugin for creating Zettelkasten-style links with automatic timestam
 
 ## Features
 
-- **Quick Trigger**: Type `{{` (or custom sequence) to open a file selection modal
-- **Ribbon Icon**: Click the link icon in the left sidebar (mobile-friendly!)
+- **Ribbon Icon**: Click the link icon in the left sidebar (works on desktop and mobile!)
+- **Mobile Toolbar**: Appears in the mobile toolbar when editing
 - **Keyboard Shortcut**: Press `Cmd+Shift+L` (Mac) or `Ctrl+Shift+L` (Windows/Linux)
 - **Command Palette**: Search for "Insert Zettel Link"
 - **Smart Link Formatting**:
   - Files starting with 12-digit timestamps (YYYYMMDDHHMM) become `[[timestamp]] Title`
   - Regular files become standard `[[filename]]` links
-- **Clean Insertion**: Automatically removes auto-paired closing characters
 
 ## Usage
 
@@ -19,17 +18,20 @@ An Obsidian plugin for creating Zettelkasten-style links with automatic timestam
 
 1. Position cursor where you want to insert a link
 2. Trigger the modal using one of these methods:
-   - Type `{{` (or your custom trigger sequence)
-   - Click the link icon in the ribbon (left sidebar)
-   - Press `Cmd+Shift+L` / `Ctrl+Shift+L`
-   - Use Command Palette: "Insert Zettel Link"
+   - **Desktop**: Click the link icon in ribbon (left sidebar)
+   - **Mobile**: Tap the command in the mobile toolbar, or use the ribbon icon
+   - **Keyboard**: Press `Cmd+Shift+L` / `Ctrl+Shift+L`
+   - **Command Palette**: Search "Insert Zettel Link"
 3. Search for the file you want to link to
-4. Select the file (Enter or click)
+4. Select the file (tap or press Enter)
 5. Link is inserted at cursor position
 
 ### Mobile Usage
 
-On mobile devices, the **ribbon icon** (link icon in left sidebar) provides the easiest access to the plugin. Simply tap it to open the file selection modal.
+The plugin works seamlessly on mobile:
+- **Mobile Toolbar**: When you add the "Insert Zettel Link" command to your mobile toolbar (via Settings → Mobile), you'll see it with a link icon
+- **Ribbon Icon**: Also available in the left sidebar ribbon
+- Simply tap either one while editing to open the file picker
 
 ### Examples
 
@@ -59,11 +61,6 @@ For files without timestamp prefixes, it creates standard Obsidian wiki-style li
 Access settings via **Settings → Zettel Link Creator** in Obsidian.
 
 ### Available Options
-
-- **Trigger sequence** (default: `{{`)
-  - Customize the character sequence that opens the modal
-  - Examples: `{{`, `@@`, `<<`, etc.
-  - Must be 2+ characters
 
 - **Extract timestamps** (default: enabled)
   - Toggle timestamp extraction on/off
