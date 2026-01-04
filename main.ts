@@ -119,19 +119,39 @@ class FileSelectModal extends SuggestModal<TFile> {
 
         const cursor = this.editor.getCursor();
 
-        // Clean up trailing braces from trigger sequence if present
+        // Clean up any auto-paired closing characters that match the trigger sequence
         const line = this.editor.getLine(cursor.line);
         const afterCursor = line.substring(cursor.ch);
 
-        // Calculate closing sequence (reverse of opening)
-        const closingSequence = this.settings.triggerSequence.split('').reverse().join('');
+        // Common auto-pair mappings
+        const autoPairMap: { [key: string]: string } = {
+            '{': '}',
+            '[': ']',
+            '(': ')',
+            '<': '>',
+            '"': '"',
+            "'": "'",
+            '`': '`'
+        };
+
+        // Build expected closing sequence based on auto-pairing rules
+        let expectedClosing = '';
+        for (let i = this.settings.triggerSequence.length - 1; i >= 0; i--) {
+            const char = this.settings.triggerSequence[i];
+            expectedClosing += autoPairMap[char] || char;
+        }
+
         let charsToRemove = 0;
 
-        if (closingSequence && afterCursor.startsWith(closingSequence)) {
-            charsToRemove = closingSequence.length;
-        } else if (closingSequence.length > 1 && afterCursor.startsWith(closingSequence.substring(0, 1))) {
-            // Handle partial closing sequence (e.g., single '}' when expecting '}}')
-            charsToRemove = 1;
+        // Check for complete expected closing sequence
+        if (expectedClosing && afterCursor.startsWith(expectedClosing)) {
+            charsToRemove = expectedClosing.length;
+        } else if (expectedClosing.length > 0) {
+            // Check for partial closing (just the first closing character)
+            const firstClosingChar = expectedClosing[0];
+            if (afterCursor.startsWith(firstClosingChar)) {
+                charsToRemove = 1;
+            }
         }
 
         if (charsToRemove > 0) {
@@ -168,6 +188,14 @@ export default class ZettelLinkPlugin extends Plugin {
 
     async onload() {
         await this.loadSettings();
+
+        // Add ribbon icon for mobile and easy access
+        this.addRibbonIcon('link', 'Insert Zettel Link', (evt: MouseEvent) => {
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView) {
+                this.openFileSearchModal(activeView.editor);
+            }
+        });
 
         // Register command for manual invocation via command palette or hotkey
         this.addCommand({

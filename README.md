@@ -4,22 +4,32 @@ An Obsidian plugin for creating Zettelkasten-style links with automatic timestam
 
 ## Features
 
-- **Quick Trigger**: Type `{{` to open a file selection modal
+- **Quick Trigger**: Type `{{` (or custom sequence) to open a file selection modal
+- **Ribbon Icon**: Click the link icon in the left sidebar (mobile-friendly!)
 - **Keyboard Shortcut**: Press `Cmd+Shift+L` (Mac) or `Ctrl+Shift+L` (Windows/Linux)
+- **Command Palette**: Search for "Insert Zettel Link"
 - **Smart Link Formatting**:
   - Files starting with 12-digit timestamps (YYYYMMDDHHMM) become `[[timestamp]] Title`
   - Regular files become standard `[[filename]]` links
-- **Clean Insertion**: Automatically removes trailing `}` or `}}` characters
+- **Clean Insertion**: Automatically removes auto-paired closing characters
 
 ## Usage
 
 ### Basic Workflow
 
 1. Position cursor where you want to insert a link
-2. Type `{{` or press the hotkey
+2. Trigger the modal using one of these methods:
+   - Type `{{` (or your custom trigger sequence)
+   - Click the link icon in the ribbon (left sidebar)
+   - Press `Cmd+Shift+L` / `Ctrl+Shift+L`
+   - Use Command Palette: "Insert Zettel Link"
 3. Search for the file you want to link to
 4. Select the file (Enter or click)
 5. Link is inserted at cursor position
+
+### Mobile Usage
+
+On mobile devices, the **ribbon icon** (link icon in left sidebar) provides the easiest access to the plugin. Simply tap it to open the file selection modal.
 
 ### Examples
 
