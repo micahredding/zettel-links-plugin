@@ -1,6 +1,6 @@
 {
 	"name": "zettel-link-creator-plugin",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"description": "Obsidian plugin for creating Zettelkasten-style links with automatic timestamp extraction",
 	"main": "main.js",
 	"scripts": {
